@@ -76,7 +76,12 @@ jobs:
         env:
           PREVIOUS: ${{ steps.latest.outputs.tag }}
         run: |
-          make changelog PREVIOUS="$PREVIOUS" CURRENT="$GITHUB_REF_NAME"
+          if [ -z "$PREVIOUS" ]; then
+            echo "First custom release" > current_release_changelog.md
+          else
+            make changelog PREVIOUS="$PREVIOUS" CURRENT="$GITHUB_REF_NAME"
+          fi
+
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           cat current_release_changelog.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

@@ -18,10 +18,12 @@ function Fixture({
   content,
   onToggle,
   disabled = false,
+  busy = false,
 }: {
   content: string
   onToggle?: (offset: number, checked: boolean) => void
   disabled?: boolean
+  busy?: boolean
 }) {
   return (
     <MemoryRouter>
@@ -31,6 +33,7 @@ function Fixture({
             content={content}
             onToggle={onToggle}
             disabled={disabled}
+            busy={busy}
           />
         ) : (
           <MarkdownPreview content={content} />
@@ -68,6 +71,15 @@ it.each([
   ['normalized blocks', ':::info\nNote\n:::\n\n' + table('[ ]'), false],
   ['wikilink', '[[Longer link]]\n\n' + table('[ ]'), false],
   ['header', '| [ ] Header |\n| --- |\n| Text |', false],
+  [
+    'blockquote table after inline code',
+    '`example`\n\n' +
+      table('[ ]')
+        .split('\n')
+        .map((line) => '> ' + line)
+        .join('\n'),
+    false,
+  ],
 ] as const)(
   'toggles table tasks at their exact source position: %s',
   (_, content, checked) => {
@@ -93,6 +105,9 @@ it.each([
   '[ ]&#32;Label',
   '[ ]<em>Label</em>',
   '&#91; &#93;',
+  '[&#120;]',
+  '[ ](https://example.com)',
+  '![ ](image.png)',
   '<span>[ ]</span>',
 ])('keeps non-task cell contents literal: %s', (cell) => {
   render(<Fixture content={table(cell)} onToggle={vi.fn()} />)
@@ -144,9 +159,10 @@ it('preserves the table checkbox and focus while saving and updating content', (
   )
   const box = screen.getByRole('checkbox')
   box.focus()
-  rerender(<Fixture content={table('[ ]')} onToggle={toggle} disabled />)
+  rerender(<Fixture content={table('[ ]')} onToggle={toggle} busy />)
   expect(screen.getByRole('checkbox')).toBe(box)
-  expect(box).toBeDisabled()
+  expect(box).not.toBeDisabled()
+  expect(box).toHaveAttribute('aria-disabled', 'true')
   fireEvent.click(box)
   expect(toggle).not.toHaveBeenCalled()
   rerender(<Fixture content={table('[x]')} onToggle={toggle} />)

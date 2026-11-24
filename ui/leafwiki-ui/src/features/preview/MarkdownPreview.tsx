@@ -23,7 +23,8 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
+import type { PluggableList } from 'unified'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
@@ -65,6 +66,9 @@ import { previewSanitizeSchema } from './previewSanitizeSchema'
 
 type Props = {
   content: string
+  components?: Components
+  remarkPlugins?: PluggableList
+  rehypePlugins?: PluggableList
   path?: string
   resolveAssetUrl?: (src: string) => string
   enableHeadlineLinks?: boolean
@@ -75,6 +79,9 @@ type Props = {
 
 export default function MarkdownPreview({
   content,
+  components: componentOverrides,
+  remarkPlugins,
+  rehypePlugins,
   path,
   resolveAssetUrl,
   enableHeadlineLinks = true,
@@ -404,8 +411,15 @@ export default function MarkdownPreview({
           </MarkdownInlineCode>
         )
       },
+      ...componentOverrides,
     }),
-    [enableHeadlineLinks, markdownLink, resolveAssetUrl, resolvedMode],
+    [
+      enableHeadlineLinks,
+      markdownLink,
+      resolveAssetUrl,
+      resolvedMode,
+      componentOverrides,
+    ],
   )
 
   const wikiTitleIndex = useMemo(
@@ -481,12 +495,14 @@ export default function MarkdownPreview({
               remarkGfm,
               remarkFlexibleMarkers,
               remarkImageSize,
+              ...(remarkPlugins ?? []),
             ]}
             rehypePlugins={[
               rehypeRaw,
               rehypeLineNumber,
               rehypeCodeFenceLineNumbers,
               rehypeWhitelistStyles,
+              ...(rehypePlugins ?? []),
               [rehypeSanitize, previewSanitizeSchema],
               // KaTeX runs after sanitizing, like highlighting: its markup is
               // generated from the TeX source (trust stays off, so \htmlClass,
@@ -509,7 +525,14 @@ export default function MarkdownPreview({
         </>
       </MarkdownPreviewErrorBoundary>
     ),
-    [normalizedContent, components, path, content],
+    [
+      normalizedContent,
+      components,
+      path,
+      content,
+      remarkPlugins,
+      rehypePlugins,
+    ],
   )
 
   if (!showToc || tocEntries.length <= 3) {

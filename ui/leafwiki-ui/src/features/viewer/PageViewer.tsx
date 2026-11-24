@@ -35,7 +35,8 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router'
 import { BacklinkInfo } from '../links/LinkInfo'
 import { extractTocEntries } from '../preview/extractTocEntries'
-import MarkdownPreview from '../preview/MarkdownPreview'
+import { InteractiveTaskPreview } from '../preview/interactiveTasks'
+import { useTaskToggle } from './useTaskToggle'
 import { buildAttachmentsSection } from './attachmentsSection'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { TocSidePanel } from '../preview/TocSidePanel'
@@ -69,6 +70,7 @@ export default function PageViewer() {
   const error = useViewerStore((s) => s.error)
   const notFound = useViewerStore((s) => s.notFound)
   const page = useViewerStore((s) => s.page)
+  const taskToggle = useTaskToggle(page)
   const loadPageData = useViewerStore((s) => s.loadPageData)
   const clearViewer = useViewerStore((s) => s.clear)
   const isPinned = useTreeStore((s) =>
@@ -297,7 +299,11 @@ export default function PageViewer() {
         {page && !error && (
           <div className="page-viewer__body">
             <article className="page-viewer__content">
-              <MarkdownPreview content={page.content} path={page.path} />
+              <InteractiveTaskPreview
+                content={page.content}
+                path={page.path}
+                {...taskToggle}
+              />
               <EmptySectionChildrenList page={page} />
             </article>
             <BacklinkInfo />

@@ -14,7 +14,7 @@ ENV_FILE_PATH="/etc/leafwiki/.env"
 ENABLE_LINK_REFACTORING="false"
 ENABLE_REVISION="false"
 MAX_REVISION_HISTORY="100"
-RELEASE_LINK="https://github.com/perber/leafwiki/"
+RELEASE_LINK="https://github.com/manuel-ullmann/leafwiki/"
 PATH_TO_BINARY="/usr/local/bin/leafwiki"
 
 
@@ -78,7 +78,7 @@ validate_version(){
 
 get_version(){
     if [[ -z "$VERSION" ]]; then
-        LATEST_VERSION=$(curl -s https://api.github.com/repos/perber/leafwiki/releases/latest \
+        LATEST_VERSION=$(curl -s https://api.github.com/repos/manuel-ullmann/leafwiki/releases/latest \
         | grep '"tag_name":' \
         | sed -E 's/.*"v([^"]+)".*/\1/')
         VERSION=$LATEST_VERSION

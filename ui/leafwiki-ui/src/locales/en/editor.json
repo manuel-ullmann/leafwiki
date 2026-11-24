@@ -1,4 +1,5 @@
 {
+  "taskCheckboxLabel": "Task checkbox",
   "wikiLinkDisambiguation": {
     "title": "Multiple pages found",
     "descriptionPrefix": "Several pages match",

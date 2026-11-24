@@ -431,6 +431,12 @@ light/dark mode application).
   `features/viewer/useHighlightsSection.ts` and `features/viewer/attachmentsSection.ts`
   ([ADR-0021](./adr/0021-page-side-panel-sections.md)); `collectHighlights.ts` reads the
   `==text==` marks out of the rendered preview.
+  `remarkTableTasks.ts` renders leading `[ ]`, `[x]`, and `[X]` in Markdown table
+  cells (for example `| Apples | [ ] |`). `interactiveTasks.tsx` enables these and
+  list tasks in the page viewer through the preview extension seam, mapping each
+  control back to its original source marker; editor previews keep them disabled.
+  `features/viewer/useTaskToggle.ts` saves a selected marker through the existing
+  page update API with its permissions and optimistic version checks.
   Shared Markdown typography lives in `src/index.css`: screen prose is limited to 680px,
   with 16px text on phones and 17px from the `sm` breakpoint. Media, code and table
   blocks retain the available surface width in editor/history previews. The viewer centers

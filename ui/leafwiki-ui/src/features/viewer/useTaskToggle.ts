@@ -58,5 +58,5 @@ export function useTaskToggle(page: Page | null) {
     },
     [page, readOnly, t],
   )
-  return { onToggle, disabled: readOnly || saving }
+  return { onToggle, disabled: readOnly, busy: saving }
 }

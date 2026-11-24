@@ -1,4 +1,5 @@
 {
+  "taskCheckboxLabel": "任务复选框",
   "wikiLinkDisambiguation": {
     "title": "找到多个页面",
     "descriptionPrefix": "有多个页面匹配",

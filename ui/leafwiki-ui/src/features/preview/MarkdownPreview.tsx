@@ -51,6 +51,7 @@ import { syntaxHighlightLanguages } from './syntaxHighlightLanguages'
 import { TocDropdownButton } from './TocDropdownButton'
 import { useHeadingsSection } from './useHeadingsSection'
 import { remarkImageSize } from './remarkImageSize'
+import { remarkTableTasks } from './remarkTableTasks'
 import { MarkdownPreviewErrorBoundary } from './MarkdownPreviewErrorBoundary'
 import {
   findScrollParent,
@@ -495,6 +496,7 @@ export default function MarkdownPreview({
               remarkGfm,
               remarkFlexibleMarkers,
               remarkImageSize,
+              remarkTableTasks,
               ...(remarkPlugins ?? []),
             ]}
             rehypePlugins={[

@@ -1,4 +1,5 @@
 {
+  "taskCheckboxLabel": "Aufgaben-Checkbox",
   "wikiLinkDisambiguation": {
     "title": "Mehrere Seiten gefunden",
     "descriptionPrefix": "Mehrere Seiten stimmen überein mit",

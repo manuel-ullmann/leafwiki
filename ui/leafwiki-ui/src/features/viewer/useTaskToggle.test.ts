@@ -62,6 +62,8 @@ it('blocks rapid concurrent writes and ignores responses after navigation', asyn
   act(() => {
     pending = result.current.onToggle(3, true)
   })
+  expect(result.current.busy).toBe(true)
+  expect(result.current.disabled).toBe(false)
   await act(() => result.current.onToggle(3, true))
   expect(updatePage).toHaveBeenCalledTimes(1)
   const other = { ...page, id: 'two' }
@@ -197,4 +199,30 @@ it('does not replace a freshly reloaded snapshot with an older save response', a
   })
   expect(useViewerStore.getState().page).toEqual(fresh)
   expect(useTreeStore.getState().patchNodeVersion).not.toHaveBeenCalled()
+})
+
+it('saves a selected table marker without changing neighbouring cells or page fields', async () => {
+  const content =
+    '| Task | Done |\r\n| --- | --- |\r\n| Äpfel 🍎 | [ ] |\r\n| Pears | [X] |\r\n'
+  const tablePage = { ...page, content }
+  useViewerStore.setState({ page: tablePage })
+  const offset = content.indexOf('[ ]') + 1
+  const updated = {
+    ...tablePage,
+    content: content.slice(0, offset) + 'x' + content.slice(offset + 1),
+    version: '2',
+  }
+  vi.mocked(updatePage).mockResolvedValue(updated)
+  const { result } = renderHook(() => useTaskToggle(tablePage))
+  await act(() => result.current.onToggle(offset, true))
+  expect(updatePage).toHaveBeenCalledExactlyOnceWith(
+    page.id,
+    page.version,
+    page.title,
+    page.slug,
+    updated.content,
+    page.tags,
+    page.properties,
+  )
+  expect(useViewerStore.getState().page).toEqual(updated)
 })

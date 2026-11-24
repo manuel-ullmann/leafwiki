@@ -1,4 +1,5 @@
 import { Checkbox } from '@/components/ui/checkbox'
+import { useTranslation } from 'react-i18next'
 import type { ListItem, Root } from 'mdast'
 import {
   Children,
@@ -10,6 +11,7 @@ import {
   type InputHTMLAttributes,
   type LiHTMLAttributes,
   type ReactNode,
+  type TdHTMLAttributes,
 } from 'react'
 import type { Components, ExtraProps } from 'react-markdown'
 import type { PluggableList } from 'unified'
@@ -17,6 +19,7 @@ import { visit } from 'unist-util-visit'
 import { isPlainListParagraph } from './previewHelpers'
 import { normalizeMarkdownBlocks } from './normalizeMarkdownBlocks'
 import MarkdownPreview from './MarkdownPreview'
+import { getTableTask } from './remarkTableTasks'
 
 type Task = { offset: number; checked: boolean; label: string }
 type InputProps = InputHTMLAttributes<HTMLInputElement> & ExtraProps
@@ -30,7 +33,11 @@ function taskMarkers(content: string) {
   return [...content.matchAll(/\[[ xX]\]/g)]
 }
 
-function sourceOffsets(original: string, normalized: string) {
+function sourceOffsets(
+  original: string,
+  normalized: string,
+  tableMarkers: Set<number>,
+) {
   const source = taskMarkers(original)
   const rendered = taskMarkers(normalized)
   const blocks = taskMarkers(normalizeMarkdownBlocks(original))
@@ -47,10 +54,12 @@ function sourceOffsets(original: string, normalized: string) {
   return new Map(
     rendered.flatMap((marker, i) => {
       const offset = source[i].index + 1
-      const lineStart = original.lastIndexOf('\n', offset) + 1
-      const prefix = original.slice(lineStart, offset - 1)
-      if (!/^(?:[ \t]*>[ \t]*)*[ \t]*(?:[-+*]|\d+[.)])[ \t]+$/.test(prefix))
-        return []
+      if (!tableMarkers.has(marker.index + 1)) {
+        const lineStart = original.lastIndexOf('\n', offset) + 1
+        const prefix = original.slice(lineStart, offset - 1)
+        if (!/^(?:[ \t]*>[ \t]*)*[ \t]*(?:[-+*]|\d+[.)])[ \t]+$/.test(prefix))
+          return []
+      }
       return [[marker.index + 1, offset]]
     }),
   )
@@ -87,39 +96,50 @@ type TaskPreviewProps = {
   path?: string
   onToggle: (offset: number, checked: boolean) => void
   disabled?: boolean
+  busy?: boolean
 }
 
 type TaskContextValue = {
   tasks: Map<number, Task>
   onToggle: TaskPreviewProps['onToggle']
   disabled: boolean
+  busy: boolean
 }
 
 const TasksContext = createContext<TaskContextValue | null>(null)
+
+function useTaskContent(node: ExtraProps['node'], children: ReactNode) {
+  const { t } = useTranslation('editor')
+  const context = useContext(TasksContext)
+  const task = context?.tasks.get(node?.position?.start.offset ?? -1)
+  return task && context
+    ? replaceCheckbox(
+        children,
+        <Checkbox
+          checked={task.checked}
+          disabled={context.disabled}
+          // Native disabled would blur the focused control during a save.
+          aria-disabled={context.busy || undefined}
+          onClick={(event) => {
+            if (context.busy) event.preventDefault()
+          }}
+          aria-label={task.label || t('taskCheckboxLabel')}
+          className="align-middle aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+          onCheckedChange={(checked) => {
+            if (!context.disabled && !context.busy)
+              context.onToggle(task.offset, checked === true)
+          }}
+        />,
+      )
+    : children
+}
 
 function TaskListItem({
   node,
   children,
   ...props
 }: LiHTMLAttributes<HTMLLIElement> & ExtraProps) {
-  const context = useContext(TasksContext)
-  const task = context?.tasks.get(node?.position?.start.offset ?? -1)
-  const content =
-    task && context
-      ? replaceCheckbox(
-          children,
-          <Checkbox
-            checked={task.checked}
-            disabled={context.disabled}
-            aria-label={task.label}
-            className="align-middle"
-            onCheckedChange={(checked) => {
-              if (!context.disabled)
-                context.onToggle(task.offset, checked === true)
-            }}
-          />,
-        )
-      : children
+  const content = useTaskContent(node, children)
   const meaningful = Children.toArray(content)
   const onlyChild = meaningful[0]
   return (
@@ -131,13 +151,35 @@ function TaskListItem({
   )
 }
 
-const components: Components = { input: InertInput, li: TaskListItem }
+function TaskTableCell({
+  node,
+  children,
+  header = false,
+  ...props
+}: TdHTMLAttributes<HTMLTableCellElement> & ExtraProps & { header?: boolean }) {
+  const content = useTaskContent(node, children)
+  return header ? <th {...props}>{content}</th> : <td {...props}>{content}</td>
+}
+
+function TaskTableHeader(
+  props: TdHTMLAttributes<HTMLTableCellElement> & ExtraProps,
+) {
+  return <TaskTableCell {...props} header />
+}
+
+const components: Components = {
+  input: InertInput,
+  li: TaskListItem,
+  td: TaskTableCell,
+  th: TaskTableHeader,
+}
 
 export function InteractiveTaskPreview({
   content,
   path,
   onToggle,
   disabled = false,
+  busy = false,
 }: TaskPreviewProps) {
   const extension = useMemo(() => {
     const tasks = new Map<number, Task>()
@@ -145,7 +187,23 @@ export function InteractiveTaskPreview({
       return (tree: Root, file: { value: unknown }) => {
         tasks.clear()
         const normalized = String(file.value)
-        const offsets = sourceOffsets(content, normalized)
+        const tableMarkers = new Set<number>()
+        visit(tree, 'tableCell', (cell) => {
+          const task = getTableTask(cell)
+          if (task) tableMarkers.add(task.markerOffset)
+        })
+        const offsets = sourceOffsets(content, normalized, tableMarkers)
+        visit(tree, 'tableCell', (cell) => {
+          const task = getTableTask(cell)
+          const start = cell.position?.start.offset
+          const offset = task && offsets.get(task.markerOffset)
+          if (task && start !== undefined && offset !== undefined)
+            tasks.set(start, {
+              offset,
+              checked: task.checked,
+              label: task.label,
+            })
+        })
         visit(tree, 'listItem', (node: ListItem) => {
           const start = node.position?.start.offset
           if (start === undefined || typeof node.checked !== 'boolean') return
@@ -171,8 +229,8 @@ export function InteractiveTaskPreview({
     return { tasks, remarkPlugins: [remarkTasks] as PluggableList }
   }, [content])
   const context = useMemo(
-    () => ({ tasks: extension.tasks, onToggle, disabled }),
-    [extension, onToggle, disabled],
+    () => ({ tasks: extension.tasks, onToggle, disabled, busy }),
+    [extension, onToggle, disabled, busy],
   )
   return (
     <TasksContext.Provider value={context}>

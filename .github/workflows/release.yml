@@ -1,5 +1,5 @@
-name: Release
 
+name: Release
 on:
   push:
     tags:
@@ -7,73 +7,54 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write      # required to create releases and upload assets
-  id-token: write     # required for OIDC token (provenance attestation)
-  attestations: write # required to write attestation to GitHub
+  contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release-binaries:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-          fetch-depth: 0  # Fetch all history for accurate changelog generation
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
 
       - name: Install Trivy
-        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567
         with:
           version: v0.76.0
 
-      # Before anything is attested or pushed: a fixable HIGH/CRITICAL
-      # finding stops the release. The arm64 build runs emulated like the
-      # multi-arch push below (no QEMU setup step there either), and both
-      # scans share the BuildKit cache with that push.
       - name: Scan Docker image
         run: |
-          VERSION=${GITHUB_REF##*/}  # extract tag like v0.1.0 or branch name
+          VERSION=${GITHUB_REF##*/}
           make scan-image VERSION=$VERSION SCAN_PLATFORM=linux/amd64
           make scan-image VERSION=$VERSION SCAN_PLATFORM=linux/arm64
 
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version-file: go.mod
-          cache: false # release artifacts must not be built from a restorable (poisonable) cache
+          cache: false
 
       - name: Make release binaries
         run: |
-          VERSION=${GITHUB_REF##*/}  # extract tag like v0.1.0 or branch name
+          VERSION=${GITHUB_REF##*/}
           echo "Using version: $VERSION"
           make release VERSION=$VERSION
 
       - name: Verify release checksums
-        # Users download binary + .sha256 into one directory and run
-        # `sha256sum -c`; the files must name the bare binary, no dir prefix.
         working-directory: releases
         run: sha256sum -c *.sha256
 
       - name: Attest release binaries
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
           subject-path: 'releases/leafwiki-${{ github.ref_name }}-*'
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_GITHUB_TOKEN }}
-
-      - name: Build & Push Docker image
-        run: |
-          VERSION=${GITHUB_REF##*/}  # extract v0.1.0
-          echo "Building Multi-Arch Docker image with version $VERSION"
-          make docker-build-publish VERSION=$VERSION REPO_OWNER=${{ github.repository_owner }}
 
       - name: Get latest tag before current one
         id: latest
@@ -101,9 +82,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Publish GitHub Release
-        # use pinned version because of issue described here:
-        # https://github.com/softprops/action-gh-release/issues/628
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         if: github.ref_type == 'tag'
         with:
           tag_name: ${{ github.ref_name }}
@@ -123,4 +102,4 @@ jobs:
             releases/leafwiki-${{ github.ref_name }}-windows-amd64.exe
             releases/leafwiki-${{ github.ref_name }}-windows-amd64.exe.sha256
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
